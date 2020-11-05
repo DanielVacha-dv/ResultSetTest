@@ -10,18 +10,33 @@ public class ResultsetClass {
 
 
   static final Logger LOGGER=Logger.getLogger("ResultsetClass.class");
-    ResultSet rs;
+    public  ResultSet rs;
+
+   public Statement statement;
+
+
+    public void setRs(ResultSet rs) {
+        this.rs = rs;
+    }
+
+    public void setStatement(Statement statement) {
+        this.statement = statement;
+    }
 
     void doAction() {
-        rs=getResultSet();
         try {
-            LOGGER.info("string doit="+rs);
-            final boolean next = rs.next();
-//            String string = rs.getString(1);
-//            LOGGER.info("string="+string);
-            String string2 = rs.getString("klic11");
-            LOGGER.info("string2="+string2);
-
+            LOGGER.info("exicuted query 1");
+            statement.executeQuery("kuku");
+             boolean next = rs.next();
+            String string2 = rs.getString("prvniklic11");
+            LOGGER.info("prvni zaznam="+string2);
+            LOGGER.info("pokus o next neni druhy zaznam ="+rs.next());
+            statement.executeQuery("kuku");
+            LOGGER.info("exicuted query 2 =");
+            LOGGER.info("cteni 1. zaznam v druhem query ="+rs.next());
+            LOGGER.info("cteni 1. zaznam-klic v druhem query ="+rs.getString("klic11"));
+            LOGGER.info("cteni 2. zaznam v druh0m query ="+rs.next());
+            LOGGER.info("cteni 2. zaznam-klic v druhem query ="+rs.getString("klic21"));
         } catch (SQLException  e){
             LOGGER.warning("to neni hezke");
         } catch (Exception e) {
@@ -29,8 +44,14 @@ public class ResultsetClass {
         }
     }
     ResultSet getResultSet() {
+        try {
+            rs=statement.executeQuery("");
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
         return rs;
     }
+
 
     public static void main(String[] args) throws Exception {
 //        ResultsetClass rs=new ResultsetClass();

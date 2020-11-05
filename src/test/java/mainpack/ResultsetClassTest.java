@@ -1,122 +1,134 @@
 package mainpack;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.*;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
 class ResultsetClassTest {
-    String[][] result = { { "column1", "column2" }, { "column1", "column2" } };
-    List<Map> resultRowMap=new ArrayList<>();
+    //vysledek list of map pro jeden executeQuery, ten muze mit vicero zaznamu
+    List<Map> resultRowListOfMap =new ArrayList<>();
+    // aktualni resultRowListOfMap
+    List<Map> actualResultRowListOfMap =new ArrayList<>();
+    // list  vsechny  executeQuery s jednotlivymi resultRowListOfMap
+    List<List> statementList=new ArrayList<>();
+    //prave uzivany resultset
+    MockRowRS usedresult1Rows = new MockRowRS();
+// atomicky citac zaznamu v resultset
+    AtomicInteger idx = new AtomicInteger(0);
+
+    @Mock
+    private ResultSet resultSet;
+
+    @Mock
+    private Statement statement;
 
     @InjectMocks
     @Spy
     private ResultsetClass testableClass;
 
-    @Mock
-    private ResultSet resultSet;
 
-    void initMap() {
+    /** vygeneruje data pro resultset s 1 radkem
+     * */
+    List<Map> initFirstRowsRS() {
+        List<Map> resultRowListOfMapLoc =new ArrayList<>();
+        Map<String,String> hashMap2=new HashMap<>();
+        hashMap2.put("prvniklic11","value11");
+        hashMap2.put("prvniklic12","value12");
+        resultRowListOfMapLoc.add(hashMap2);
+        return resultRowListOfMapLoc;
+    }
+
+    /** vygeneruje data pro resultset s 2radky
+     * */
+    List<Map> init2RowsRS() {
+        List<Map> resultRowListOfMapLoc =new ArrayList<>();
         Map<String,String> hashMap=new HashMap<>();
         hashMap.put("klic11","value11");
         hashMap.put("klic12","value12");
-        resultRowMap.add(hashMap);
+        resultRowListOfMapLoc.add(hashMap);
         Map<String,String> hashMap2=new HashMap<>();
         hashMap2.put("klic21","value21");
         hashMap2.put("klic22","value22");
-        resultRowMap.add(hashMap2);
+        resultRowListOfMapLoc.add(hashMap2);
+        return resultRowListOfMapLoc;
     }
+
+
     @BeforeEach
     public   void beforeTest() {
-        initMap();
-        testableClass=Mockito.spy(new ResultsetClass());
+        statementList= new ArrayList<>(Arrays.asList(initFirstRowsRS(),init2RowsRS()));
         resultSet=Mockito.mock(ResultSet.class);
+        statement=Mockito.mock(Statement.class);
+        testableClass=Mockito.spy(new ResultsetClass());
+        testableClass.setRs(resultSet);
+        testableClass.setStatement(statement);
     }
 
     public void beforeMethod() throws SQLException {
-        when(testableClass.getResultSet()).thenReturn(resultSet);
-        final AtomicInteger idx = new AtomicInteger(0);
-        final MockRow row = new MockRow();
-
+      //  when(testableClass.getResultSet()).thenReturn(resultSet);
+          idx = new AtomicInteger(0);
+        final AtomicInteger idStatements = new AtomicInteger(0);
+       MockRowRS resultRows = new MockRowRS();
+        doAnswer(new Answer<ResultSet>() {
+            @Override
+            public ResultSet answer(InvocationOnMock invocation) throws Throwable {
+                int index = idStatements.getAndIncrement();
+                actualResultRowListOfMap=statementList.get(index);
+                idx = new AtomicInteger(0);
+                return resultSet;
+            }
+        }).when(statement).executeQuery(anyString());
         doAnswer(new Answer<Boolean>() {
-
             @Override
             public Boolean answer(InvocationOnMock invocation) throws Throwable {
                 int index = idx.getAndIncrement();
-                if (result.length <= index) {
+                if (actualResultRowListOfMap.size() <= index) {
                     return false;
                 }
-                String[] current = result[index];
-            Map<String,String> map=    resultRowMap.get(index);
-                row.setCurrentRowData(current);
-                row.setCurrentHashMapData(map);
+                Map<String,String> map=    actualResultRowListOfMap.get(index);
+                resultRows.setCurrentHashMapData(map);
                 return true;
             }
         }).when(resultSet).next();
-
-        doAnswer(new Answer<String>() {
-
-            @Override
-            public String answer(InvocationOnMock invocation) throws Throwable {
-                Object[] args = invocation.getArguments();
-                int idx = ((Integer) args[0]).intValue();
-                return row.getColumn(idx);
-            }
-
-            ;
-        }).when(resultSet).getString(anyInt());
         doAnswer(new Answer<String>() {
 
             @Override
             public String answer(InvocationOnMock invocation) throws Throwable {
                 Object[] args = invocation.getArguments();
                 String  idx =  (String) args[0];
-                return row.getColumn(idx);
+                return resultRows.getColumn(idx);
             }
 
             ;
         }).when(resultSet).getString(anyString());
     }
 
-    static class MockRow {
-        String[] rowData;
+    static class MockRowRS {
         Map<String,String> hashMap=new HashMap<>();
-
-        public void setCurrentRowData(String[] rowData) {
-            this.rowData = rowData;
-        }
 
         public void setCurrentHashMapData(Map<String, String> hashMap) {
             this.hashMap = hashMap;
         }
 
-        public String getColumn(int idx) {
-            return rowData[idx - 1];
-        }
         public String getColumn(String  key) {
             return hashMap.get(key);
         }
-
     }
+
+
     @Test
     void testMain() throws SQLException {
         beforeMethod();
